@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>폐기물처분부담금 사전 계산 및 재활용에 따른 가치 환산</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <header class="bg-green-700 text-white p-4 text-center">
+    <img src="templates/keco_logo.png" alt="한국환경공단 로고" class="mx-auto h-12">
+    <h1 class="text-xl font-bold mt-2">폐기물처분부담금 사전 계산 및 재활용에 따른 가치 환산</h1>
+  </header>
+
+  <main class="max-w-2xl mx-auto p-4 bg-white shadow-lg rounded-lg mt-6">
+    <div class="space-y-4">
+      <div>
+        <label class="block font-semibold">폐기물 유형</label>
+        <select id="wasteCategory" onchange="updateOptions()" class="w-full border rounded px-3 py-2">
+          <option value="business">사업장폐기물</option>
+          <option value="construction">건설폐기물</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold">처리 방식</label>
+        <select id="disposalMethod" class="w-full border rounded px-3 py-2">
+          <option value="incineration">소각</option>
+          <option value="landfill">매립</option>
+        </select>
+      </div>
+
+      <div id="wasteTypeContainer">
+        <label class="block font-semibold">폐기물 특성 (사업장폐기물만 해당)</label>
+        <select id="wasteType" class="w-full border rounded px-3 py-2">
+          <option value="combustible">가연성</option>
+          <option value="non_combustible">불연성</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold">처분년도</label>
+        <select id="disposalYear" class="w-full border rounded px-3 py-2">
+          <option value="2018">2018</option>
+          <option value="2019">2019</option>
+          <option value="2020">2020</option>
+          <option value="2021">2021</option>
+          <option value="2022">2022</option>
+          <option value="2023">2023</option>
+          <option value="2024" selected>2024</option>
+          <option value="2025">2025</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block font-semibold">배출량 (kg)</label>
+        <input type="number" id="wasteAmount" class="w-full border rounded px-3 py-2" placeholder="예: 100" />
+      </div>
+
+      <button onclick="calculate()" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded font-semibold">비용 계산</button>
+
+      <div id="result" class="p-4 bg-gray-50 border rounded text-sm"></div>
+
+      <div class="mt-6">
+        <canvas id="costChart"></canvas>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    let chart;
+    const rateIndex = {
+      2018: 1, 2019: 1.019, 2020: 1.023, 2021: 1.024,
+      2022: 1.059, 2023: 1.132, 2024: 1.168, 2025: 1.192
+    };
+
+    function updateOptions() {
+      const category = document.getElementById("wasteCategory").value;
+      const wasteTypeContainer = document.getElementById("wasteTypeContainer");
+      wasteTypeContainer.style.display = category === "business" ? "block" : "none";
+    }
+
+    function calculate() {
+      const category = document.getElementById("wasteCategory").value;
+      const disposalMethod = document.getElementById("disposalMethod").value;
+      const wasteType = document.getElementById("wasteType").value;
+      const disposalYear = document.getElementById("disposalYear").value;
+      const wasteAmount = parseFloat(document.getElementById("wasteAmount").value);
+      if (isNaN(wasteAmount) || wasteAmount <= 0) {
+        alert("유효한 배출량(kg)을 입력해주세요.");
+        return;
+      }
+
+      const index = rateIndex[disposalYear];
+      let rate = 0;
+      if (category === 'business') {
+        if (disposalMethod === 'incineration') rate = 10;
+        else if (disposalMethod === 'landfill') rate = (wasteType === 'combustible') ? 25 : 10;
+      } else if (category === 'construction') {
+        rate = (disposalMethod === 'incineration') ? 10 : 30;
+      }
+
+      const fee = wasteAmount * rate * index;
+      const recycleCost = wasteAmount * 20;
+      const carbonReduction = wasteAmount * 1.5;
+      const jobCreation = (wasteAmount / 1000) * 0.1;
+      const environmentValue = wasteAmount * 30;
+
+      document.getElementById("result").innerHTML =
+        `<strong>폐기물처분부담금:</strong> ${Math.round(fee).toLocaleString()}원<br>` +
+        `<strong>재활용 비용:</strong> ${Math.round(recycleCost).toLocaleString()}원<br>` +
+        `<strong>🌍 온실가스 절감:</strong> ${carbonReduction.toLocaleString()}kg CO₂<br>` +
+        `<strong>👷 일자리 창출:</strong> ${jobCreation.toFixed(3)} 명<br>` +
+        `<strong>🌱 환경보전 가치:</strong> ${environmentValue.toLocaleString()}원`;
+
+      updateChart(fee, environmentValue);
+    }
+
+    function updateChart(fee, benefit) {
+      const ctx = document.getElementById("costChart").getContext("2d");
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: ["폐기물처분부담금", "환경 편익"],
+          datasets: [{
+            label: "비용/편익 (원)",
+            data: [fee, benefit],
+            backgroundColor: ["#f87171", "#34d399"]
+          }]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: context => `${context.dataset.label}: ${Math.round(context.raw).toLocaleString()}원`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: value => `${value.toLocaleString()}원`
+              }
+            }
+          }
+        }
+      });
+    }
+
+    window.onload = updateOptions;
+  </script>
+</body>
+</html>
